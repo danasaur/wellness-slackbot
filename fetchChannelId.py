@@ -6,18 +6,19 @@ USAGE: python fetchChannelId.py <channel_name>
 
 import requests
 import sys
-import os
 import json
+from tokens import Tokens
 
 # Environment variables must be set with your tokens
-USER_TOKEN_STRING =  os.environ['SLACK_USER_TOKEN_STRING']
-URL_TOKEN_STRING =  os.environ['SLACK_URL_TOKEN_STRING']
+tokens = Tokens()
+USER_TOKEN_STRING = tokens.get_user_token()
+URL_TOKEN_STRING = tokens.get_url_token()
 
 HASH = "%23"
 
 channelName = sys.argv[1]
 
-params = {"token": USER_TOKEN_STRING }
+params = {"token": USER_TOKEN_STRING}
 
 # Capture Response as JSON
 response = requests.get("https://slack.com/api/channels.list", params=params)

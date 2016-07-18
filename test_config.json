@@ -1,0 +1,76 @@
+{
+  "teamDomain": "servli",
+  "channelName": "test-wellness",
+  "channelId": "C1B5Q8TMM",
+
+  "officeHours": {
+    "on": false,
+    "begin": 9,
+    "end": 17
+   },
+
+  "debug": false,
+
+  "callouts": {
+    "timeBetween": {
+      "minTime": 1,
+      "maxTime": 2,
+      "units": "minutes"
+    },
+    "numPeople": 3,
+    "slidingWindowSize": 8,
+    "groupCalloutChance": 0.25
+  },
+
+  "exercises": [
+    {
+      "id": 0,
+      "name": "(knee) pushups",
+      "minReps": 5,
+      "maxReps": 15,
+      "units": "reps"
+    },
+    {
+      "id": 1,
+      "name": "planks",
+      "minReps": 40,
+      "maxReps": 60,
+      "units": "second"
+    },
+    {
+      "id": 3,
+      "name": "squats",
+      "minReps": 10,
+      "maxReps": 20,
+      "units": "reps"
+    },
+    {
+      "id": 4,
+      "name": "treadmill",
+      "minReps": 5,
+      "maxReps": 15,
+      "units": "minutes on the"
+    },
+    {
+      "id": 5,
+      "name": "water",
+      "minReps": 3,
+      "maxReps": 10,
+      "units": "gulps of"
+    },
+    {
+      "id": 4,
+      "name": "neck rolls and stretching",
+      "minReps": 2,
+      "maxReps": 3,
+      "units": "minutes of"
+    },
+    {
+      "id": 7,
+      "name": "a break of your choice",
+      "minReps": 2,
+      "maxReps": 10,
+      "units": "minutes of"
+    }
+  ]
+}

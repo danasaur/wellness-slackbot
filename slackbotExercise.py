@@ -8,12 +8,16 @@ from random import shuffle
 import pickle
 import os.path
 import datetime
+from tokens import Tokens
 
 from User import User
 
+EVERYBODY = False
+
 # Environment variables must be set with your tokens
-USER_TOKEN_STRING =  os.environ['SLACK_USER_TOKEN_STRING']
-URL_TOKEN_STRING =  os.environ['SLACK_URL_TOKEN_STRING']
+tokens = Tokens()
+USER_TOKEN_STRING = tokens.get_user_token()
+URL_TOKEN_STRING = tokens.get_url_token()
 
 HASH = "%23"
 
@@ -50,7 +54,12 @@ class Bot:
     '''
     def setConfiguration(self):
         # Read variables fromt the configuration file
-        with open('config.json') as f:
+        current_dir = os.path.dirname(__file__)
+
+        config_filename = os.path.join(
+            current_dir, 'config.json'
+        )
+        with open(config_filename) as f:
             settings = json.load(f)
 
             self.team_domain = settings["teamDomain"]
@@ -77,10 +86,11 @@ Selects an active user from a list of users
 '''
 def selectUser(bot, exercise):
     active_users = fetchActiveUsers(bot)
-
+    
     # Add all active users not already in the user queue
     # Shuffles to randomly add new active users
     shuffle(active_users)
+    
     bothArrays = set(active_users).intersection(bot.user_queue)
     for user in active_users:
         if user not in bothArrays:
@@ -105,7 +115,7 @@ def selectUser(bot, exercise):
             if sliding_window <= 0:
                 break
 
-    # If everybody has done exercises or we didn't find a person within our sliding window,
+    # If everybody has done exercises or we didn't find a person within our sliding window,    
     for user in bot.user_queue:
         if user in active_users:
             bot.user_queue.remove(user)
@@ -113,7 +123,9 @@ def selectUser(bot, exercise):
 
     # If we weren't able to select one, just pick a random
     print "Selecting user at random (queue length was " + str(len(bot.user_queue)) + ")"
-    return active_users[random.randrange(0, len(active_users))]
+    return None    
+    #return active_users[random.randrange(0, len(active_users))]
+    
 
 
 '''
@@ -150,16 +162,28 @@ period has past.
 def selectExerciseAndStartTime(bot):
     next_time_interval = selectNextTimeInterval(bot)
     minute_interval = next_time_interval/60
-    exercise = selectExercise(bot)
+    exercise, everybody = selectExercise(bot)
 
     # Announcement String of next lottery time
-    lottery_announcement = "NEXT LOTTERY FOR " + exercise["name"].upper() + " IS IN " + str(minute_interval) + (" MINUTES" if minute_interval != 1 else " MINUTE")
+    #lottery_announcement = "The next lottery for " + exercise["name"] + " will take place in " + str(minute_interval) + (" minutes" if minute_interval != 1 else " minute") + '.'
+    
+    if minute_interval != 1:
+        m = "minutes"
+    else:
+        m = "minute" 
+    '''
+    if everybody:
+        lottery_announcement = " \n Next lottery for cute animals will take place " \
+        "in {1} {2}.".format(exercise["name"], str(minute_interval), m)
+    else:
+        lottery_announcement = " \n Next lottery for {0} will take place " \
+        "in {1} {2}.".format(exercise["name"], str(minute_interval), m)
 
     # Announce the exercise to the thread
     if not bot.debug:
         requests.post(bot.post_URL, data=lottery_announcement)
     print lottery_announcement
-
+    '''
     # Sleep the script until time is up
     if not bot.debug:
         time.sleep(next_time_interval)
@@ -167,15 +191,19 @@ def selectExerciseAndStartTime(bot):
         # If debugging, once every 5 seconds
         time.sleep(5)
 
-    return exercise
+    return exercise, everybody
 
 
 '''
 Selects the next exercise
 '''
 def selectExercise(bot):
+    everybody = False
+    if random.random() < bot.group_callout_chance:
+        everybody = True
+    
     idx = random.randrange(0, len(bot.exercises))
-    return bot.exercises[idx]
+    return bot.exercises[idx], everybody
 
 
 '''
@@ -186,38 +214,82 @@ def selectNextTimeInterval(bot):
 
 
 '''
+Selects a cute giphy image url
+'''
+def select_cute_image(query):
+    request_url = 'http://api.giphy.com/v1/gifs/search?q={0}&api_key=dc6zaTOxFJmzC'.format(query)
+    r = requests.get(request_url)
+    json_data = json.loads(r.text)
+    randindex = random.randint(0, len(json_data['data']))
+    gif_url = json_data['data'][randindex]['images']['downsized']['url']
+    return gif_url
+    
+'''
 Selects a person to do the already-selected exercise
 '''
-def assignExercise(bot, exercise):
+def assignExercise(bot, exercise, everybody):
     # Select number of reps
     exercise_reps = random.randrange(exercise["minReps"], exercise["maxReps"]+1)
 
-    winner_announcement = str(exercise_reps) + " " + str(exercise["units"]) + " " + exercise["name"] + " RIGHT NOW "
-
+    winner_announcement = "you've been selected for " + str(exercise_reps) + " " + str(exercise["units"]) + " " + exercise["name"] + ". \n \n"
+    winner_address = ''
+    
     # EVERYBODY
-    if random.random() < bot.group_callout_chance:
-        winner_announcement += "@channel!"
+    if everybody:
+        query = random.choice(['puppies', 
+            'kittens', 
+            'baby turtles', 
+            'bunnies', 
+            'baby elephants', 
+            'baby otters',
+            'baby raccoons',
+            'baby llamas',
+            'baby goats',
+            'baby skunks',
+            'mini donkeys',
+            'ducklings',
+            'baby beavers',
+            'baby chipmunks',
+            'baby wombats',
+            'baby hedgehogs',
+            'baby seals',
+            'platypus',
+            'baby pandas'])
+        gif_url = select_cute_image(query)
+        winner_address += " @channel"
+        winner_announcement = '{0} {1}'.format(gif_url, winner_address)
+        
 
         for user_id in bot.user_cache:
             user = bot.user_cache[user_id]
             user.addExercise(exercise, exercise_reps)
 
-        logExercise(bot,"@channel",exercise["name"],exercise_reps,exercise["units"])
+        #logExercise(bot,"@channel",exercise["name"],exercise_reps,exercise["units"])
 
     else:
-        winners = [selectUser(bot, exercise) for i in range(bot.num_people_per_callout)]
-
+        
+        winners = []
         for i in range(bot.num_people_per_callout):
-            winner_announcement += str(winners[i].getUserHandle())
-            if i == bot.num_people_per_callout - 2:
-                winner_announcement += ", and "
-            elif i == bot.num_people_per_callout - 1:
-                winner_announcement += "!"
+            winner = selectUser(bot, exercise)
+            if winner is not None:
+                if winner not in winners:
+                    winners.append(winner)
+                    winner.addExercise(exercise, exercise_reps)
+                    logExercise(bot,winner.getUserHandle(),exercise["name"],exercise_reps,exercise["units"])
+        #winners = [selectUser(bot, exercise) for i in range(bot.num_people_per_callout)]
+        
+        print(winners)
+        for i in range(len(winners)):
+            
+            winner_address += str(winners[i].getUserHandle())
+            if i == len(winners) -1:
+                winner_address += ": "
+            elif i >= len(winners) - 2:
+                winner_address += " and "
             else:
-                winner_announcement += ", "
+                winner_address += ", "
 
-            winners[i].addExercise(exercise, exercise_reps)
-            logExercise(bot,winners[i].getUserHandle(),exercise["name"],exercise_reps,exercise["units"])
+        winner_announcement = winner_address + winner_announcement
 
     # Announce the user
     if not bot.debug:
@@ -290,10 +362,10 @@ def main():
                 bot.setConfiguration()
 
                 # Get an exercise to do
-                exercise = selectExerciseAndStartTime(bot)
+                exercise, everybody = selectExerciseAndStartTime(bot)
 
                 # Assign the exercise to someone
-                assignExercise(bot, exercise)
+                assignExercise(bot, exercise, everybody)
 
             else:
                 # Sleep the script and check again for office hours
